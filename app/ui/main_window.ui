@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>960</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Flashcards — Карточки для повторения</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="mainHorizontalLayout" stretch="1,2">
+    <item>
+     <layout class="QVBoxLayout" name="decksColumnLayout">
+      <item>
+       <widget class="QLabel" name="decksLabel">
+        <property name="text">
+         <string>Колоды</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QTableWidget" name="decksTable">
+        <column>
+         <property name="text">
+          <string>Колода</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Всего</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>На сегодня</string>
+         </property>
+        </column>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="deckButtonsLayout">
+        <item>
+         <widget class="QPushButton" name="createDeckButton">
+          <property name="text">
+           <string>Создать</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="renameDeckButton">
+          <property name="text">
+           <string>Переименовать</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="deleteDeckButton">
+          <property name="text">
+           <string>Удалить</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QVBoxLayout" name="cardsColumnLayout">
+      <item>
+       <widget class="QLabel" name="cardsLabel">
+        <property name="text">
+         <string>Карточки выбранной колоды</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="searchInput">
+        <property name="placeholderText">
+         <string>Поиск по тексту карточек...</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QTableWidget" name="cardsTable">
+        <column>
+         <property name="text">
+          <string>Лицо</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Оборот</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Картинки</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Коробка</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>След. повторение</string>
+         </property>
+        </column>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="cardButtonsLayout">
+        <item>
+         <widget class="QPushButton" name="createCardButton">
+          <property name="text">
+           <string>Добавить карточку</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="editCardButton">
+          <property name="text">
+           <string>Редактировать</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="deleteCardButton">
+          <property name="text">
+           <string>Удалить</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar"/>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
