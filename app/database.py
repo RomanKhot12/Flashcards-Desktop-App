@@ -34,7 +34,8 @@ class Database:
     def __init__(self, db_path):
         self.db_path = Path(db_path)
 
-    # Открывает соединение с БД и включает каскадное удаление (foreign_keys)
+    # Открывает соединение с БД и включает каскадное удаление (foreign_keys).
+    # Соединение нужно закрывать через conn.close(): with conn его не закрывает.
     def connect(self):
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(self.db_path)
@@ -45,5 +46,9 @@ class Database:
 
     # Создаёт таблицы и индексы, если база ещё пустая
     def initialize(self):
-        with self.connect() as conn:
-            conn.executescript(SCHEMA_SQL)
+        conn = self.connect()
+        try:
+            with conn:
+                conn.executescript(SCHEMA_SQL)
+        finally:
+            conn.close()
