@@ -24,7 +24,7 @@ class FlashcardRepository:
         self.images_dir = Path(images_dir)
         self.images_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Проверка данных ---
+    # Проверка данных
 
     def check_deck_name(self, name):
         cleaned = name.strip()
@@ -49,7 +49,7 @@ class FlashcardRepository:
             )
         return cleaned
 
-    # --- Работа с файлами изображений ---
+    # Работа с файлами изображений
 
     # Возвращает полный путь к сохранённой картинке или None
     def get_image_path(self, filename):
@@ -79,28 +79,38 @@ class FlashcardRepository:
 
         return unique_name
 
-    # Удаляет файлы изображений с диска, если на них больше не ссылается ни одна карточка
-    def delete_unused_images(self, conn, filenames):
-        for name in set(filenames):
-            if not name:
-                continue
-            row = conn.execute(
-                "SELECT 1 FROM cards WHERE front_image = ? OR back_image = ? LIMIT 1",
-                (name, name),
-            ).fetchone()
-            if row is None:
-                file_path = self.images_dir / name
-                if file_path.is_file():
-                    file_path.unlink()
+    # Удаляет файл картинки с диска. Если файл занят, оставляем его: данные в БД уже сохранены
+    def delete_image_file(self, filename):
+        file_path = self.images_dir / filename
+        if file_path.is_file():
+            try:
+                file_path.unlink()
+            except OSError:
+                pass
+
+    # Удаляет файлы изображений, если на них больше не ссылается ни одна карточка.
+    # Вызывается после сохранения изменений в БД.
+    def delete_unused_images(self, filenames):
+        conn = self.db.connect()
+        try:
+            for name in set(filenames):
+                if not name:
+                    continue
+                row = conn.execute(
+                    "SELECT 1 FROM cards WHERE front_image = ? OR back_image = ? LIMIT 1",
+                    (name, name),
+                ).fetchone()
+                if row is None:
+                    self.delete_image_file(name)
+        finally:
+            conn.close()
 
     # Удаляет только что скопированные файлы, если запись в БД завершилась ошибкой
     def cleanup_copied_files(self, filenames):
         for name in filenames:
-            file_path = self.images_dir / name
-            if file_path.is_file():
-                file_path.unlink()
+            self.delete_image_file(name)
 
-    # --- Преобразование строк БД в модели ---
+    # Преобразование строк БД в модели
 
     def row_to_deck(self, row):
         return Deck(
@@ -122,15 +132,16 @@ class FlashcardRepository:
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
-    # --- Операции с колодами ---
+    # Операции с колодами
 
     # Создаёт новую колоду с проверкой уникальности названия
     def create_deck(self, name):
         cleaned, normalized = self.check_deck_name(name)
         now = datetime.now().isoformat(timespec="seconds")
 
+        conn = self.db.connect()
         try:
-            with self.db.connect() as conn:
+            with conn:
                 cursor = conn.execute(
                     "INSERT INTO decks (name, name_normalized, created_at) VALUES (?, ?, ?)",
                     (cleaned, normalized, now),
@@ -140,6 +151,8 @@ class FlashcardRepository:
                 ).fetchone()
         except sqlite3.IntegrityError as exc:
             raise DuplicateError(f"Колода «{cleaned}» уже существует.") from exc
+        finally:
+            conn.close()
 
         return self.row_to_deck(row)
 
@@ -147,8 +160,9 @@ class FlashcardRepository:
     def rename_deck(self, deck_id, new_name):
         cleaned, normalized = self.check_deck_name(new_name)
 
+        conn = self.db.connect()
         try:
-            with self.db.connect() as conn:
+            with conn:
                 cursor = conn.execute(
                     "UPDATE decks SET name = ?, name_normalized = ? WHERE id = ?",
                     (cleaned, normalized, deck_id),
@@ -158,33 +172,43 @@ class FlashcardRepository:
                 row = conn.execute("SELECT * FROM decks WHERE id = ?", (deck_id,)).fetchone()
         except sqlite3.IntegrityError as exc:
             raise DuplicateError(f"Колода «{cleaned}» уже существует.") from exc
+        finally:
+            conn.close()
 
         return self.row_to_deck(row)
 
     # Удаляет колоду, все её карточки и связанные файлы изображений
     def delete_deck(self, deck_id):
-        with self.db.connect() as conn:
-            rows = conn.execute(
-                "SELECT front_image, back_image FROM cards WHERE deck_id = ?",
-                (deck_id,),
-            ).fetchall()
+        conn = self.db.connect()
+        try:
+            with conn:
+                rows = conn.execute(
+                    "SELECT front_image, back_image FROM cards WHERE deck_id = ?",
+                    (deck_id,),
+                ).fetchall()
 
-            # Собираем имена картинок до удаления колоды (карточки удалятся каскадно)
-            images_to_check = []
-            for row in rows:
-                images_to_check.append(row["front_image"])
-                images_to_check.append(row["back_image"])
+                # Собираем имена картинок до удаления колоды (карточки удалятся каскадно)
+                images_to_check = []
+                for row in rows:
+                    images_to_check.append(row["front_image"])
+                    images_to_check.append(row["back_image"])
 
-            cursor = conn.execute("DELETE FROM decks WHERE id = ?", (deck_id,))
-            if cursor.rowcount == 0:
-                raise NotFoundError(f"Колода с id={deck_id} не найдена.")
+                cursor = conn.execute("DELETE FROM decks WHERE id = ?", (deck_id,))
+                if cursor.rowcount == 0:
+                    raise NotFoundError(f"Колода с id={deck_id} не найдена.")
+        finally:
+            conn.close()
 
-            self.delete_unused_images(conn, images_to_check)
+        self.delete_unused_images(images_to_check)
 
     # Возвращает колоду по её id
     def get_deck(self, deck_id):
-        with self.db.connect() as conn:
+        conn = self.db.connect()
+        try:
             row = conn.execute("SELECT * FROM decks WHERE id = ?", (deck_id,)).fetchone()
+        finally:
+            conn.close()
+
         if row is None:
             raise NotFoundError(f"Колода с id={deck_id} не найдена.")
         return self.row_to_deck(row)
@@ -210,8 +234,11 @@ class FlashcardRepository:
             "GROUP BY d.id "
             "ORDER BY d.name_normalized ASC"
         )
-        with self.db.connect() as conn:
+        conn = self.db.connect()
+        try:
             rows = conn.execute(query, (target_date,)).fetchall()
+        finally:
+            conn.close()
 
         result = []
         for row in rows:
@@ -225,7 +252,7 @@ class FlashcardRepository:
             result.append(summary)
         return result
 
-    # --- Операции с карточками ---
+    # Операции с карточками
 
     # Создаёт карточку в коробке 1 со сроком повторения «сегодня»
     def create_card(
@@ -242,6 +269,12 @@ class FlashcardRepository:
         clean_front = self.check_card_side(front_text, has_front_img, "лицевой")
         clean_back = self.check_card_side(back_text, has_back_img, "оборотной")
 
+        if today is not None:
+            review_date = today.isoformat()
+        else:
+            review_date = date.today().isoformat()
+        now = datetime.now().isoformat(timespec="seconds")
+
         copied_files = []
         try:
             front_img_name = None
@@ -254,46 +287,45 @@ class FlashcardRepository:
                 back_img_name = self.copy_image(back_image_path)
                 copied_files.append(back_img_name)
 
-            if today is not None:
-                review_date = today.isoformat()
-            else:
-                review_date = date.today().isoformat()
-            now = datetime.now().isoformat(timespec="seconds")
+            conn = self.db.connect()
+            try:
+                with conn:
+                    deck_exists = conn.execute(
+                        "SELECT 1 FROM decks WHERE id = ?", (deck_id,)
+                    ).fetchone()
+                    if deck_exists is None:
+                        raise NotFoundError(f"Колода с id={deck_id} не найдена.")
 
-            with self.db.connect() as conn:
-                deck_exists = conn.execute(
-                    "SELECT 1 FROM decks WHERE id = ?", (deck_id,)
-                ).fetchone()
-                if deck_exists is None:
-                    raise NotFoundError(f"Колода с id={deck_id} не найдена.")
-
-                insert_sql = (
-                    "INSERT INTO cards ("
-                    "    deck_id, front_text, back_text, front_image, back_image, "
-                    "    box, next_review_date, created_at"
-                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-                )
-                cursor = conn.execute(
-                    insert_sql,
-                    (
-                        deck_id,
-                        clean_front,
-                        clean_back,
-                        front_img_name,
-                        back_img_name,
-                        MIN_BOX,
-                        review_date,
-                        now,
-                    ),
-                )
-                row = conn.execute(
-                    "SELECT * FROM cards WHERE id = ?", (cursor.lastrowid,)
-                ).fetchone()
-                return self.row_to_card(row)
+                    insert_sql = (
+                        "INSERT INTO cards ("
+                        "    deck_id, front_text, back_text, front_image, back_image, "
+                        "    box, next_review_date, created_at"
+                        ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                    )
+                    cursor = conn.execute(
+                        insert_sql,
+                        (
+                            deck_id,
+                            clean_front,
+                            clean_back,
+                            front_img_name,
+                            back_img_name,
+                            MIN_BOX,
+                            review_date,
+                            now,
+                        ),
+                    )
+                    row = conn.execute(
+                        "SELECT * FROM cards WHERE id = ?", (cursor.lastrowid,)
+                    ).fetchone()
+            finally:
+                conn.close()
         except Exception:
-            # Если при сохранении в БД возникла ошибка — убираем скопированные картинки
+            # Если при сохранении в БД возникла ошибка, убираем скопированные картинки
             self.cleanup_copied_files(copied_files)
             raise
+
+        return self.row_to_card(row)
 
     # Обновляет текст и картинки карточки. По умолчанию старые картинки сохраняются.
     def update_card(
@@ -306,8 +338,12 @@ class FlashcardRepository:
         new_back_image=None,
         remove_back_image=False,
     ):
-        with self.db.connect() as conn:
+        conn = self.db.connect()
+        try:
             row = conn.execute("SELECT * FROM cards WHERE id = ?", (card_id,)).fetchone()
+        finally:
+            conn.close()
+
         if row is None:
             raise NotFoundError(f"Карточка с id={card_id} не найдена.")
 
@@ -349,58 +385,77 @@ class FlashcardRepository:
             else:
                 back_img_name = existing.back_image
 
-            with self.db.connect() as conn:
-                update_sql = (
-                    "UPDATE cards "
-                    "SET front_text = ?, back_text = ?, front_image = ?, back_image = ? "
-                    "WHERE id = ?"
-                )
-                conn.execute(
-                    update_sql,
-                    (clean_front, clean_back, front_img_name, back_img_name, card_id),
-                )
-                self.delete_unused_images(conn, old_images)
-                updated_row = conn.execute(
-                    "SELECT * FROM cards WHERE id = ?", (card_id,)
-                ).fetchone()
-                return self.row_to_card(updated_row)
+            conn = self.db.connect()
+            try:
+                with conn:
+                    update_sql = (
+                        "UPDATE cards "
+                        "SET front_text = ?, back_text = ?, front_image = ?, back_image = ? "
+                        "WHERE id = ?"
+                    )
+                    conn.execute(
+                        update_sql,
+                        (clean_front, clean_back, front_img_name, back_img_name, card_id),
+                    )
+                    updated_row = conn.execute(
+                        "SELECT * FROM cards WHERE id = ?", (card_id,)
+                    ).fetchone()
+            finally:
+                conn.close()
         except Exception:
             self.cleanup_copied_files(copied_files)
             raise
+
+        # Старые картинки удаляем только после успешного сохранения в БД
+        self.delete_unused_images(old_images)
+        return self.row_to_card(updated_row)
 
     # Обновляет номер коробки и дату следующего повторения после ответа пользователя
     def update_card_progress(self, card_id, box, next_review_date):
         if box < MIN_BOX or box > MAX_BOX:
             raise ValidationError(f"Номер коробки должен быть от {MIN_BOX} до {MAX_BOX}.")
 
-        with self.db.connect() as conn:
-            cursor = conn.execute(
-                "UPDATE cards SET box = ?, next_review_date = ? WHERE id = ?",
-                (box, next_review_date.isoformat(), card_id),
-            )
-            if cursor.rowcount == 0:
-                raise NotFoundError(f"Карточка с id={card_id} не найдена.")
-            row = conn.execute("SELECT * FROM cards WHERE id = ?", (card_id,)).fetchone()
-            return self.row_to_card(row)
+        conn = self.db.connect()
+        try:
+            with conn:
+                cursor = conn.execute(
+                    "UPDATE cards SET box = ?, next_review_date = ? WHERE id = ?",
+                    (box, next_review_date.isoformat(), card_id),
+                )
+                if cursor.rowcount == 0:
+                    raise NotFoundError(f"Карточка с id={card_id} не найдена.")
+                row = conn.execute("SELECT * FROM cards WHERE id = ?", (card_id,)).fetchone()
+        finally:
+            conn.close()
+
+        return self.row_to_card(row)
 
     # Удаляет карточку и неиспользуемые файлы изображений
     def delete_card(self, card_id):
-        with self.db.connect() as conn:
-            row = conn.execute(
-                "SELECT front_image, back_image FROM cards WHERE id = ?", (card_id,)
-            ).fetchone()
-            if row is None:
-                raise NotFoundError(f"Карточка с id={card_id} не найдена.")
+        conn = self.db.connect()
+        try:
+            with conn:
+                row = conn.execute(
+                    "SELECT front_image, back_image FROM cards WHERE id = ?", (card_id,)
+                ).fetchone()
+                if row is None:
+                    raise NotFoundError(f"Карточка с id={card_id} не найдена.")
 
-            conn.execute("DELETE FROM cards WHERE id = ?", (card_id,))
-            self.delete_unused_images(conn, [row["front_image"], row["back_image"]])
+                conn.execute("DELETE FROM cards WHERE id = ?", (card_id,))
+        finally:
+            conn.close()
 
-    # Возвращает карточки колоды; если задан search_query — фильтрует без учёта регистра
+        self.delete_unused_images([row["front_image"], row["back_image"]])
+
+    # Возвращает карточки колоды; если задан search_query, фильтрует без учёта регистра
     def get_cards_by_deck(self, deck_id, search_query=""):
-        with self.db.connect() as conn:
+        conn = self.db.connect()
+        try:
             rows = conn.execute(
                 "SELECT * FROM cards WHERE deck_id = ? ORDER BY id ASC", (deck_id,)
             ).fetchall()
+        finally:
+            conn.close()
 
         cards = []
         for row in rows:
@@ -448,8 +503,11 @@ class FlashcardRepository:
             where_sql = "WHERE " + " AND ".join(conditions)
 
         query = f"SELECT * FROM cards {where_sql} ORDER BY id ASC"
-        with self.db.connect() as conn:
+        conn = self.db.connect()
+        try:
             rows = conn.execute(query, params).fetchall()
+        finally:
+            conn.close()
 
         result = []
         for row in rows:
