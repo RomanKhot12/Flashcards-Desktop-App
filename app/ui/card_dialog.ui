@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>480</width>
-    <height>380</height>
+    <width>560</width>
+    <height>560</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -25,6 +25,69 @@
     <widget class="QPlainTextEdit" name="frontTextEdit"/>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="frontImageLayout">
+     <item>
+      <widget class="QLabel" name="frontImageLabel">
+       <property name="minimumSize">
+        <size>
+         <width>200</width>
+         <height>150</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>200</width>
+         <height>150</height>
+        </size>
+       </property>
+       <property name="frameShape">
+        <enum>QFrame::Box</enum>
+       </property>
+       <property name="text">
+        <string>Нет картинки</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="frontImageButtonsLayout">
+       <item>
+        <widget class="QPushButton" name="frontChooseButton">
+         <property name="text">
+          <string>Выбрать картинку...</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="frontRemoveButton">
+         <property name="text">
+          <string>Убрать картинку</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="frontImageSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item>
     <widget class="QLabel" name="backLabel">
      <property name="text">
       <string>Оборотная сторона (ответ)</string>
@@ -33,6 +96,69 @@
    </item>
    <item>
     <widget class="QPlainTextEdit" name="backTextEdit"/>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="backImageLayout">
+     <item>
+      <widget class="QLabel" name="backImageLabel">
+       <property name="minimumSize">
+        <size>
+         <width>200</width>
+         <height>150</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>200</width>
+         <height>150</height>
+        </size>
+       </property>
+       <property name="frameShape">
+        <enum>QFrame::Box</enum>
+       </property>
+       <property name="text">
+        <string>Нет картинки</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="backImageButtonsLayout">
+       <item>
+        <widget class="QPushButton" name="backChooseButton">
+         <property name="text">
+          <string>Выбрать картинку...</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="backRemoveButton">
+         <property name="text">
+          <string>Убрать картинку</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="backImageSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </item>
+    </layout>
    </item>
    <item>
     <layout class="QHBoxLayout" name="buttonsLayout">
