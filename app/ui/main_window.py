@@ -65,7 +65,7 @@ class MainWindow(QMainWindow):
         self.editCardButton.clicked.connect(self.on_edit_card)
         self.deleteCardButton.clicked.connect(self.on_delete_card)
 
-    # --- Получение текущих выбранных элементов ---
+    # Получение текущих выбранных элементов
 
     def get_selected_id(self, table):
         selected_rows = table.selectionModel().selectedRows()
@@ -86,7 +86,7 @@ class MainWindow(QMainWindow):
             return ""
         return item.text()
 
-    # --- Обновление таблиц ---
+    # Обновление таблиц
 
     def refresh_decks(self, select_deck_id=None):
         if select_deck_id is None:
@@ -161,7 +161,7 @@ class MainWindow(QMainWindow):
             return "Нет"
         return ", ".join(parts)
 
-    # --- Действия с колодами ---
+    # Действия с колодами
 
     def on_create_deck(self):
         name, ok = QInputDialog.getText(self, "Новая колода", "Название колоды:")
@@ -217,7 +217,7 @@ class MainWindow(QMainWindow):
             return
         self.refresh_decks()
 
-    # --- Действия с карточками ---
+    # Действия с карточками
 
     def on_create_card(self):
         deck_id = self.get_selected_id(self.decksTable)
@@ -234,6 +234,8 @@ class MainWindow(QMainWindow):
                 deck_id=deck_id,
                 front_text=dialog.get_front_text(),
                 back_text=dialog.get_back_text(),
+                front_image_path=dialog.get_new_front_image(),
+                back_image_path=dialog.get_new_back_image(),
             )
         except FlashcardsError as exc:
             QMessageBox.warning(self, "Ошибка", str(exc))
@@ -257,7 +259,12 @@ class MainWindow(QMainWindow):
         if selected_card is None:
             return
 
-        dialog = CardDialog(card=selected_card, parent=self)
+        dialog = CardDialog(
+            card=selected_card,
+            front_image_path=self.repo.get_image_path(selected_card.front_image),
+            back_image_path=self.repo.get_image_path(selected_card.back_image),
+            parent=self,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -266,6 +273,10 @@ class MainWindow(QMainWindow):
                 card_id=card_id,
                 front_text=dialog.get_front_text(),
                 back_text=dialog.get_back_text(),
+                new_front_image=dialog.get_new_front_image(),
+                remove_front_image=dialog.is_front_image_removed(),
+                new_back_image=dialog.get_new_back_image(),
+                remove_back_image=dialog.is_back_image_removed(),
             )
         except FlashcardsError as exc:
             QMessageBox.warning(self, "Ошибка", str(exc))
